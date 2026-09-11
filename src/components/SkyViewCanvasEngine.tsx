@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { TelemetryReadout, OpticsConfig } from '../types';
 import { ZoomIn, ZoomOut, RotateCcw, Sparkles } from 'lucide-react';
+import { DEFAULT_OPTICS_CONFIG } from './OpticsDeckModal';
 
 interface SkyViewCanvasEngineProps {
   telemetry: TelemetryReadout;
@@ -10,9 +11,10 @@ interface SkyViewCanvasEngineProps {
 
 export const SkyViewCanvasEngine: React.FC<SkyViewCanvasEngineProps> = ({
   telemetry,
-  opticsConfig,
+  opticsConfig = DEFAULT_OPTICS_CONFIG,
   stationName,
 }) => {
+  const activeOptics = opticsConfig || DEFAULT_OPTICS_CONFIG;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -213,7 +215,7 @@ export const SkyViewCanvasEngine: React.FC<SkyViewCanvasEngineProps> = ({
       // A. SOLAR CORONA & LIGHT FUSION STREAMERS (Totality & Near-Totality)
       if (isTotality || obscurationRatio > 0.94) {
         ctx.save();
-        const coronaIntensity = opticsConfig.lightFusionBoost * opticsConfig.coronaBloom;
+        const coronaIntensity = activeOptics.lightFusionBoost * activeOptics.coronaBloom;
         const streamerCount = 32;
 
         // Dynamic Coronal Rays
@@ -258,7 +260,7 @@ export const SkyViewCanvasEngine: React.FC<SkyViewCanvasEngineProps> = ({
         ctx.fill();
 
         // B. CHROMOSPHERE RED PROMINENCES (Hydrogen-Alpha 656nm Ruby Flare Jets)
-        if (opticsConfig.plasmaLoops) {
+        if (activeOptics.plasmaLoops) {
           const prominenceAngles = [0.4, 1.8, 3.2, 4.7, 5.8];
           prominenceAngles.forEach((pAngle, idx) => {
             const pX = centerX + Math.cos(pAngle) * (baseSunRadius * 1.01);
@@ -307,14 +309,14 @@ export const SkyViewCanvasEngine: React.FC<SkyViewCanvasEngineProps> = ({
           baseSunRadius,
           centerX,
           centerY,
-          baseSunRadius * 1.8 * opticsConfig.lightFusionBoost
+          baseSunRadius * 1.8 * activeOptics.lightFusionBoost
         );
         sunBloom.addColorStop(0, 'rgba(251, 191, 36, 0.45)');
         sunBloom.addColorStop(0.5, 'rgba(245, 158, 11, 0.15)');
         sunBloom.addColorStop(1, 'rgba(245, 158, 11, 0)');
         ctx.fillStyle = sunBloom;
         ctx.beginPath();
-        ctx.arc(centerX, centerY, baseSunRadius * 1.8 * opticsConfig.lightFusionBoost, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, baseSunRadius * 1.8 * activeOptics.lightFusionBoost, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -353,8 +355,8 @@ export const SkyViewCanvasEngine: React.FC<SkyViewCanvasEngineProps> = ({
         ctx.fill();
 
         // 8-Point Diffraction Spikes
-        if (opticsConfig.diffractionSpikes) {
-          const spikeLen = 80 * zoomLevel * opticsConfig.lightFusionBoost;
+        if (activeOptics.diffractionSpikes) {
+          const spikeLen = 80 * zoomLevel * activeOptics.lightFusionBoost;
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
           ctx.lineWidth = 2;
 

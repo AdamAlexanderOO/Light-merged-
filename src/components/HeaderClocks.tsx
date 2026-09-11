@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { RotateCcw, Maximize2, Minimize2, Info } from 'lucide-react';
+import { RotateCcw, Maximize2, Minimize2, Info, Sparkles } from 'lucide-react';
 
 interface HeaderClocksProps {
   currentTimestamp: number;
   onResetCamera?: () => void;
   onOpenInfo?: () => void;
+  onOpenMosaicForge?: () => void;
 }
 
 interface TimeComponent {
@@ -29,7 +30,8 @@ function getTimeComponentsForOffset(utcSeconds: number, offsetHours: number): Ti
 export const HeaderClocks: React.FC<HeaderClocksProps> = ({
   currentTimestamp,
   onResetCamera,
-  onOpenInfo
+  onOpenInfo,
+  onOpenMosaicForge,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -60,8 +62,19 @@ export const HeaderClocks: React.FC<HeaderClocksProps> = ({
 
   return (
     <header className="w-full bg-black border-b border-white/15 px-2 py-2 sm:px-4 sm:py-2.5 flex items-center justify-between z-30 text-white font-sans select-none shrink-0 shadow-2xl relative">
-      {/* Spacer on left for symmetry on wide screens */}
-      <div className="hidden lg:flex items-center w-36 shrink-0" />
+      {/* Left button: Launch Mosaic Forge Studio */}
+      <div className="flex items-center shrink-0">
+        {onOpenMosaicForge && (
+          <button
+            onClick={onOpenMosaicForge}
+            className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded bg-gradient-to-r from-amber-500/20 to-amber-600/30 hover:from-amber-500/30 hover:to-amber-600/40 text-amber-300 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)] transition-all text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider"
+            title="Launch Pixel Canvas Engine & Mosaic Forge"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>MOSAIC FORGE</span>
+          </button>
+        )}
+      </div>
 
       {/* Main Centered Clocks Bar: responsive, non-wrapping, jitter-free with tight unified units */}
       <div className="flex-1 flex items-center justify-center flex-nowrap gap-2 sm:gap-5 md:gap-8 lg:gap-12 min-w-0">

@@ -4,6 +4,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ObservationStation, LatLon, VisionMode, OpticsConfig } from '../types';
 import { OBSERVATION_STATIONS, UMBRA_PATH_WAYPOINTS } from '../data/eclipseData';
 import { getUmbraPosition, getSubSolarPoint, latLonToVector3 } from '../utils/astronomy';
+import {
+  getProceduralDayTexture,
+  getProceduralNightTexture,
+  getProceduralWaterTexture,
+} from '../utils/proceduralEarthTextures';
 
 interface Earth3DProps {
   currentTimestamp: number;
@@ -394,9 +399,9 @@ export const Earth3D: React.FC<Earth3DProps> = ({
 
     // 1. Scientifically Accurate Custom Earth Shader (Day/Night texture blending + 3D Elliptical Lunar Shadow)
     const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
-    const fallbackDay = generateFallbackDayTexture();
-    const fallbackNight = generateFallbackNightTexture();
-    const fallbackWater = generateFallbackWaterTexture();
+    const fallbackDay = getProceduralDayTexture();
+    const fallbackNight = getProceduralNightTexture();
+    const fallbackWater = getProceduralWaterTexture();
 
     const earthMat = new THREE.ShaderMaterial({
       uniforms: {

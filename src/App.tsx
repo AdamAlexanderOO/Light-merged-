@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DEFAULT_START_SECONDS, SIMULATION_START_SECONDS, SIMULATION_END_SECONDS, OBSERVATION_STATIONS } from './data/eclipseData';
-import { ObservationStation, LatLon, TelemetryReadout } from './types';
+import { ObservationStation, LatLon, TelemetryReadout, VisionMode, OpticsConfig, CombatDeckTelemetry } from './types';
 import { calculateTelemetry, getUmbraPosition, calculateDistanceKm, getAutoTrackingStation } from './utils/astronomy';
 import { HeaderClocks } from './components/HeaderClocks';
 import { Earth3D } from './components/Earth3D';
@@ -9,12 +9,26 @@ import { PathTimelinePanel } from './components/PathTimelinePanel';
 import { TimelineScrubber } from './components/TimelineScrubber';
 import { SkyViewPanel } from './components/SkyViewPanel';
 import { AttributionModal } from './components/AttributionModal';
+import { VisionCombatDeckHUD } from './components/VisionCombatDeckHUD';
+import { OpticsDeckModal, DEFAULT_OPTICS_CONFIG } from './components/OpticsDeckModal';
+import { audioDeck } from './utils/audioDeck';
+import { HubApp } from './game/HubApp';
 
 export default function App() {
+  // App Mode State: Default to requested 'mosaic-forge' studio
+  const [appMode, setAppMode] = useState<'mosaic-forge' | 'eclipse'>('mosaic-forge');
+
   // Simulation State
   const [currentTimestamp, setCurrentTimestamp] = useState<number>(DEFAULT_START_SECONDS);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [speedMultiplier, setSpeedMultiplier] = useState<number>(300); // default 300x speed
+
+  // Multi-Spectral Vision & Optics State
+  const [visionMode, setVisionMode] = useState<VisionMode>('light-fusion');
+  const [opticsConfig, setOpticsConfig] = useState<OpticsConfig>(DEFAULT_OPTICS_CONFIG);
+  const [isOpticsModalOpen, setIsOpticsModalOpen] = useState<boolean>(false);
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(true);
+  const [isCombatDeckOpen, setIsCombatDeckOpen] = useState<boolean>(true);
 
   // Attributions / Info Modal State
   const [isAttributionModalOpen, setIsAttributionModalOpen] = useState<boolean>(false);
@@ -78,6 +92,57 @@ export default function App() {
     }
     return calculateTelemetry(activeStation.coords, currentTimestamp, activeStation.isCustom ? undefined : activeStation.id);
   }, [activeStation, currentTimestamp]);
+
+  // Real-time Tactical Combat Deck Telemetry (ground velocity, Mach, solar flux, intercept)
+  const combatDeckTelemetry: CombatDeckTelemetry = useMemo(() => {
+    const umbra = getUmbraPosition(currentTimestamp);
+    const umbraSpeed = umbra ? 3150 + Math.sin(currentTimestamp / 350) * 420 : 0;
+    const mach = umbraSpeed / 1225;
+    const isTotalityNow = telemetry.currentPhase === 'TOTALITY!';
+    const isNearTotality = telemetry.obscurationPercentage > 95;
+
+    let interceptStatus: CombatDeckTelemetry['interceptStatus'] = 'STANDBY';
+    if (isTotalityNow) interceptStatus = 'LOCK';
+    else if (isNearTotality) interceptStatus = 'APPROACH';
+    else if (telemetry.obscurationPercentage > 0) interceptStatus = 'APPROACH';
+    else if (telemetry.timeToNextPhase?.includes('Eclipse ends')) interceptStatus = 'EGRESS';
+
+    return {
+      umbraSpeedKmh: Math.round(umbraSpeed),
+      machNumber: parseFloat(mach.toFixed(1)),
+      solarFluxSfu: 148,
+      solarWindSpeedKmS: Math.round(opticsConfig.solarWindFlux),
+      geomagneticKp: 2.3,
+      interceptStatus,
+    };
+  }, [currentTimestamp, telemetry, opticsConfig.solarWindFlux]);
+
+  // Synthesize totality sound alert when totality begins
+  useEffect(() => {
+    if (telemetry.currentPhase === 'TOTALITY!' && !isAudioMuted) {
+      audioDeck.playTotalityAlert();
+    }
+  }, [telemetry.currentPhase, isAudioMuted]);
+
+  const handleToggleAudioMute = useCallback(() => {
+    audioDeck.init();
+    setIsAudioMuted((prev) => {
+      const next = !prev;
+      audioDeck.setMuted(next);
+      if (!next) {
+        audioDeck.playChirp(660);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectVisionMode = useCallback((mode: VisionMode) => {
+    setVisionMode(mode);
+    audioDeck.init();
+    if (!isAudioMuted) {
+      audioDeck.playChirp(880);
+    }
+  }, [isAudioMuted]);
 
   // Handle custom pin drop on 3D Globe
   const handleDropCustomPin = useCallback((coords: LatLon) => {
@@ -194,6 +259,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleSelectTrackingMode]);
 
+  if (appMode === 'mosaic-forge') {
+    return <HubApp onBackToEclipse={() => setAppMode('eclipse')} />;
+  }
+
   return (
     <div className="flex flex-col w-screen h-screen bg-[#050505] text-slate-100 overflow-hidden font-sans select-none">
       {/* 1. Top Header Bar */}
@@ -201,6 +270,19 @@ export default function App() {
         currentTimestamp={currentTimestamp}
         onResetCamera={handleResetCamera}
         onOpenInfo={() => setIsAttributionModalOpen(true)}
+        onOpenMosaicForge={() => setAppMode('mosaic-forge')}
+      />
+
+      {/* 1.5. Tactical Multi-Spectral Vision & Combat Deck HUD */}
+      <VisionCombatDeckHUD
+        visionMode={visionMode}
+        onSelectVisionMode={handleSelectVisionMode}
+        telemetry={combatDeckTelemetry}
+        onOpenOpticsModal={() => setIsOpticsModalOpen(true)}
+        isAudioMuted={isAudioMuted}
+        onToggleAudioMute={handleToggleAudioMute}
+        isCombatDeckOpen={isCombatDeckOpen}
+        onToggleCombatDeck={() => setIsCombatDeckOpen(!isCombatDeckOpen)}
       />
 
       {/* 2. Main Workspace: 3D Globe + Floating Reference UI Panels */}
@@ -215,6 +297,8 @@ export default function App() {
             showPathLine={showPathLine}
             showPenumbra={showPenumbra}
             showDayNightTerminator={showDayNightTerminator}
+            visionMode={visionMode}
+            opticsConfig={opticsConfig}
             onCameraModeChange={(mode) => {
               setCameraMode(mode);
               if (mode === 'free' || mode === 'focused-station' || mode === 'top-down') {
@@ -263,6 +347,7 @@ export default function App() {
               selectedStation={activeStation}
               telemetry={telemetry}
               currentTimestamp={currentTimestamp}
+              opticsConfig={opticsConfig}
             />
           </div>
         </div>
@@ -363,6 +448,7 @@ export default function App() {
                 selectedStation={activeStation}
                 telemetry={telemetry}
                 currentTimestamp={currentTimestamp}
+                opticsConfig={opticsConfig}
               />
             )}
             {mobileTab === 'timeline' && (
@@ -390,6 +476,15 @@ export default function App() {
       <AttributionModal
         isOpen={isAttributionModalOpen}
         onClose={() => setIsAttributionModalOpen(false)}
+      />
+
+      {/* 5. Light Fusion & Canvas Optics Tuning Deck Modal */}
+      <OpticsDeckModal
+        isOpen={isOpticsModalOpen}
+        onClose={() => setIsOpticsModalOpen(false)}
+        config={opticsConfig}
+        onChange={setOpticsConfig}
+        onReset={() => setOpticsConfig(DEFAULT_OPTICS_CONFIG)}
       />
     </div>
   );
