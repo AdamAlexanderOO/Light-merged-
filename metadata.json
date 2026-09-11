@@ -1,0 +1,8 @@
+{
+  "name": "Remix 2026 Total Solar Eclipse ",
+  "description": "Interactive 3D simulation and scientific visualizer of the August 12, 2026 total solar eclipse",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
