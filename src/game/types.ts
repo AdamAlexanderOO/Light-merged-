@@ -50,6 +50,7 @@ export interface PresetAsset {
 }
 
 export type ActiveStudioView =
+  | 'tactical-hud'
   | 'mosaic-forge'
   | 'text-matrix'
   | 'character-rigs'
